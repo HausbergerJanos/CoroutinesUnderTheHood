@@ -1,71 +1,160 @@
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 
 /**
-Let's see the following methods:
+There are three essential coroutine builders provided by kotlinx.coroutines library:
+- launch
+- runBlocking
+- async
+ */
 
-- suspend fun getUser(): User?
-- suspend fun setUser(user: User)
-- suspend fun checkAvailability(flight: Flight): Boolean
+fun main() {
+    //launchSingleAsyncBuilder()
+    launchMultipleAsyncBuilder()
+}
 
-Under the hood they will be:
-
-- fun getUser(continuation: Continuation<*>): Any?
-- fun setUser(user: User, continuation: Continuation<*>): Any
-- fun checkAvailability(
-    flight: Flight,
-    continuation: Continuation<*>
-): Any
-
-The result type under the hood is different from the originally declared. It changed from Unit and Boolean to Any,
-and from User? to Any?. The reason is that a suspending function might be suspended, and so it might not return a
-declared type. In such a case, it returns a special marker **COROUTINE_SUSPENDED**. Since getUser might return User? or
-COROUTINE_SUSPENDED (that is of type Any), its result type must be the closest supertype of User? and Any, so it is Any?.
+/**
+fun main() = runBlocking {
+    GlobalScope.launch {
+        delay(1000L)
+        println("World!")
+    }
+    GlobalScope.launch {
+        delay(1000L)
+        println("World!")
+    }
+    GlobalScope.launch {
+        delay(1000L)
+        println("World!")
+    }
+    println("Hello,")
+    delay(2000L)
+}
 */
 
-suspend fun main() {
-    myFunction()
+/**
+fun main() {
+    //launchGlobalScopes()
+    launchRunBlocking()
+}
+*/
+
+/**
+ * The way how launch works is conceptually similar to starting a new
+ * thread (thread function). We just start a coroutine, and it will run independently.
+ * -----------------------------------------------------------------------------------
+ *  Hello,
+ *  (1 sec)
+ *  World!
+ *  World!
+ *  World!
+ *  ----------------------------------------------------------------------------------
+ */
+fun launchGlobalScopes() {
+    GlobalScope.launch {
+        delay(1000L)
+        println("World!")
+    }
+    GlobalScope.launch {
+        delay(1000L)
+        println("World!")
+    }
+    GlobalScope.launch {
+        delay(1000L)
+        println("World!")
+    }
+    println("Hello,")
+    Thread.sleep(2000L)
 }
 
 /**
-A very simple function that prints something before and after delay.
-
-A simplified picture of how myFunction looks under the hood.
-
-The function could be started from two places: either from the beginning (in case of a first call) or from the point
-after suspension (in case of resuming from continuation).
-
-fun myFunction(continuation: Continuation<Unit>): Any {
-    // This function needs its own continuation to remember its state. At the beginning of its body, myFunction will
-    // wrap the continuation (the parameter) with its own continuation (MyFunctionContinuation). This should be done
-    // only if the continuation isn’t wrapped already. If it is, this is part of the resume process, and we should
-    // keep the continuation unchanged
-    val continuation = continuation as? MyFunctionContinuation
-        ?: MyFunctionContinuation(continuation)
-
-    // To identify the current state, we use a field called label. At the start, it is 0, so the function will start
-    // from the beginning.
-    if (continuation.label == 0) {
-        println("Before")
-        // Before each suspension point, it is set to the next state, so that after resume we start from just
-        // after suspension.
-        continuation.label = 1
-        // When delay is suspended, it returns COROUTINE_SUSPENDED, then myFunction returns COROUTINE_SUSPENDED,
-        // the same is done by the function that called it, and the function that called this function, and all other
-        // functions until the top of the call stack
-        if (delay(1000, continuation) == COROUTINE_SUSPENDED){
-            return COROUTINE_SUSPENDED
-        }
+ * runBlocking is a very atypical builder. It blocks the thread it has been started on, whenever its coroutine is
+ * suspended (similar to suspending main). This means that delay(1000L) inside runBlocking will behave like a
+ * Thread.sleep(1000L).
+ * -----------------------------------------------------------------------------------
+ *  (1 sec)
+ *  World!
+ *  (1 sec)
+ *  World!
+ *  (1 sec)
+ *  World!
+ *  Hello,
+ *  ----------------------------------------------------------------------------------
+ *  There are actually a couple of specific use cases for runBlocking where it’s used. The first one is the main function,
+ *  where we need to block the thread, because otherwise the program will end. Another common use case is unit tests,
+ *  where we need to block the thread for the same reason.
+ */
+fun launchRunBlocking() {
+    runBlocking {
+        delay(1000L)
+        println("World!")
     }
-
-    if (continuation.label == 1) {
-        println("After")
-        return Unit
+    runBlocking {
+        delay(1000L)
+        println("World!")
     }
-
-    error("Impossible")
-} */
-suspend fun myFunction() {
-    println("Before")
-    delay(1000)
-    println("After")
+    runBlocking {
+        delay(1000L)
+        println("World!")
+    }
+    println("Hello,")
 }
+
+/**
+ * Just like the launch builder, async starts a coroutine immediately when it is called. So it is away to start a few
+ * processes at once and then await their results together.
+ */
+private fun launchSingleAsyncBuilder() = runBlocking {
+    val resultDeferred: Deferred<Int> = GlobalScope.async {
+        delay(1000)
+        42
+    }
+
+    val result = resultDeferred.await()
+    println(result)
+}
+
+/**
+ * The returned Deferred stores a value inside once it is produced, so once it is ready, it will be immediately returned
+ * from await. Although if we call await before the value is produced, we are suspended until the value is ready.
+ * -----------------------------------------------------------------------------
+ * (1 sec)
+ * Text 1
+ * (2 sec)
+ * Text 2
+ * Text 3
+ * -----------------------------------------------------------------------------
+ */
+private fun launchMultipleAsyncBuilder() = runBlocking {
+    val res1 = GlobalScope.async {
+        delay(1000L)
+        "Text 1"
+    }
+    val res2 = GlobalScope.async {
+        delay(3000L)
+        "Text 2"
+    }
+    val res3 = GlobalScope.async {
+        delay(2000L)
+        "Text 3"
+    }
+    println(res1.await())
+    println(res2.await())
+    println(res3.await())
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
