@@ -7,12 +7,13 @@ There are three essential coroutine builders provided by kotlinx.coroutines libr
 - async
  */
 
+/**
 fun main() {
     //launchSingleAsyncBuilder()
     launchMultipleAsyncBuilder()
 }
+*/
 
-/**
 fun main() = runBlocking {
     GlobalScope.launch {
         delay(1000L)
@@ -29,7 +30,6 @@ fun main() = runBlocking {
     println("Hello,")
     delay(2000L)
 }
-*/
 
 /**
 fun main() {
