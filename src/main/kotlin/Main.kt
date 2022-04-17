@@ -1,160 +1,107 @@
-import kotlinx.coroutines.*
+import custom_context_sample.CreateUser
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Job
+import kotlin.coroutines.CoroutineContext
 
-/**
-There are three essential coroutine builders provided by kotlinx.coroutines library:
-- launch
-- runBlocking
-- async
- */
-
-/**
 fun main() {
-    //launchSingleAsyncBuilder()
-    launchMultipleAsyncBuilder()
-}
-*/
+    //fold()
+    //subtracting()
+    //replace()
+    //add()
+    //find()
 
-fun main() = runBlocking {
-    GlobalScope.launch {
-        delay(1000L)
-        println("World!")
-    }
-    GlobalScope.launch {
-        delay(1000L)
-        println("World!")
-    }
-    GlobalScope.launch {
-        delay(1000L)
-        println("World!")
-    }
-    println("Hello,")
-    delay(2000L)
+    //testBuilderWithContext()
+    testCustomContext()
 }
 
-/**
-fun main() {
-    //launchGlobalScopes()
-    launchRunBlocking()
+private fun testCustomContext() {
+    val createUser = CreateUser()
+    createUser.init()
 }
-*/
+
+private fun testBuilderWithContext() {
+    val contextAndBuilders = ContextAndBuilders()
+    contextAndBuilders.logSomething()
+    println("/////////////////////////////////")
+    contextAndBuilders.logSomethingAndOverrideChildContext()
+    println("/////////////////////////////////")
+    contextAndBuilders.contextInSuspendingFunction()
+    println("/////////////////////////////////")
+    contextAndBuilders.tryCustomContext()
+}
 
 /**
- * The way how launch works is conceptually similar to starting a new
- * thread (thread function). We just start a coroutine, and it will run independently.
- * -----------------------------------------------------------------------------------
- *  Hello,
- *  (1 sec)
- *  World!
- *  World!
- *  World!
- *  ----------------------------------------------------------------------------------
+ * Adding contexts
  */
-fun launchGlobalScopes() {
-    GlobalScope.launch {
-        delay(1000L)
-        println("World!")
-    }
-    GlobalScope.launch {
-        delay(1000L)
-        println("World!")
-    }
-    GlobalScope.launch {
-        delay(1000L)
-        println("World!")
-    }
-    println("Hello,")
-    Thread.sleep(2000L)
+private fun add() {
+    val ctx1: CoroutineContext = CoroutineName("Name1")
+    println(ctx1[CoroutineName]?.name) // Name1
+    println(ctx1[Job]?.isActive) // null
+
+    val ctx2: CoroutineContext = Job()
+    println(ctx2[CoroutineName]?.name) // null
+    println(ctx2[Job]?.isActive) // true, because "Active"
+    // is the default state of a job created this way
+
+    val ctx3 = ctx1 + ctx2
+    println(ctx3[CoroutineName]?.name) // Name1
+    println(ctx3[Job]?.isActive) // true
 }
 
 /**
- * runBlocking is a very atypical builder. It blocks the thread it has been started on, whenever its coroutine is
- * suspended (similar to suspending main). This means that delay(1000L) inside runBlocking will behave like a
- * Thread.sleep(1000L).
- * -----------------------------------------------------------------------------------
- *  (1 sec)
- *  World!
- *  (1 sec)
- *  World!
- *  (1 sec)
- *  World!
- *  Hello,
- *  ----------------------------------------------------------------------------------
- *  There are actually a couple of specific use cases for runBlocking where it’s used. The first one is the main function,
- *  where we need to block the thread, because otherwise the program will end. Another common use case is unit tests,
- *  where we need to block the thread for the same reason.
+ * When another element with the same key is added, just like in a map,
+ * the new element replaces the previous one.
  */
-fun launchRunBlocking() {
-    runBlocking {
-        delay(1000L)
-        println("World!")
-    }
-    runBlocking {
-        delay(1000L)
-        println("World!")
-    }
-    runBlocking {
-        delay(1000L)
-        println("World!")
-    }
-    println("Hello,")
+private fun replace() {
+    val ctx1: CoroutineContext = CoroutineName("Name1")
+    println(ctx1[CoroutineName]?.name) // Name1
+
+    val ctx2: CoroutineContext = CoroutineName("Name2")
+    println(ctx2[CoroutineName]?.name) // Name2
+
+    val ctx3 = ctx1 + ctx2
+    println(ctx3[CoroutineName]?.name) // Name2
+
 }
 
 /**
- * Just like the launch builder, async starts a coroutine immediately when it is called. So it is away to start a few
- * processes at once and then await their results together.
+ * Finding elements in CoroutineContext
  */
-private fun launchSingleAsyncBuilder() = runBlocking {
-    val resultDeferred: Deferred<Int> = GlobalScope.async {
-        delay(1000)
-        42
-    }
-
-    val result = resultDeferred.await()
-    println(result)
+private fun find() {
+    val ctx: CoroutineContext = CoroutineName("A name")
+    val coroutineName: CoroutineName? = ctx[CoroutineName]
+    // or ctx.get(CoroutineName)
+    println(coroutineName?.name) // A name
+    val job: Job? = ctx[Job] // or ctx.get(Job)
+    println(job) // null
 }
 
 /**
- * The returned Deferred stores a value inside once it is produced, so once it is ready, it will be immediately returned
- * from await. Although if we call await before the value is produced, we are suspended until the value is ready.
- * -----------------------------------------------------------------------------
- * (1 sec)
- * Text 1
- * (2 sec)
- * Text 2
- * Text 3
- * -----------------------------------------------------------------------------
+ * Subtracting elements in CoroutineContext
  */
-private fun launchMultipleAsyncBuilder() = runBlocking {
-    val res1 = GlobalScope.async {
-        delay(1000L)
-        "Text 1"
-    }
-    val res2 = GlobalScope.async {
-        delay(3000L)
-        "Text 2"
-    }
-    val res3 = GlobalScope.async {
-        delay(2000L)
-        "Text 3"
-    }
-    println(res1.await())
-    println(res2.await())
-    println(res3.await())
+private fun subtracting() {
+    val ctx = CoroutineName("Name1") + Job()
+    println(ctx[CoroutineName]?.name) // Name1
+    println(ctx[Job]?.isActive) // true
 
+    val ctx2 = ctx.minusKey(CoroutineName)
+    println(ctx2[CoroutineName]?.name) // null
+    println(ctx2[Job]?.isActive) // true
+
+    val ctx3 = (ctx + CoroutineName("Name2"))
+        .minusKey(CoroutineName)
+    println(ctx3[CoroutineName]?.name) // null
+    println(ctx3[Job]?.isActive) // true
 }
 
+private fun fold() {
+    val ctx = CoroutineName("Name1") + Job()
 
+    ctx.fold("start") { acc, element -> "$acc $element " }
+        .also(::println)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+    val empty = emptyList<CoroutineContext>()
+    ctx.fold(empty) { acc, element -> acc + element }
+        .joinToString()
+        .also(::println)
+}
