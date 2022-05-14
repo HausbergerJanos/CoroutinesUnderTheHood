@@ -1,107 +1,87 @@
-import custom_context_sample.CreateUser
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.Job
-import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.*
 
 fun main() {
-    //fold()
-    //subtracting()
-    //replace()
-    //add()
-    //find()
-
-    //testBuilderWithContext()
-    testCustomContext()
-}
-
-private fun testCustomContext() {
-    val createUser = CreateUser()
-    createUser.init()
-}
-
-private fun testBuilderWithContext() {
-    val contextAndBuilders = ContextAndBuilders()
-    contextAndBuilders.logSomething()
-    println("/////////////////////////////////")
-    contextAndBuilders.logSomethingAndOverrideChildContext()
-    println("/////////////////////////////////")
-    contextAndBuilders.contextInSuspendingFunction()
-    println("/////////////////////////////////")
-    contextAndBuilders.tryCustomContext()
+    val ca = ChildrenAwaiting()
+    ca.waitChildren()
+    //ca.waitChildrenWithCoroutineContext()
+    //ca.neverEnding()
+    //ca.ending()
+    //ca.completeManually()
+    //ca.completeManuallyWithException()
+    //ca.launchParentJob()
 }
 
 /**
- * Adding contexts
+ * In the above example, the parent does not wait for its children, because it has no relation with them.
+ * It is because the child uses job from the argument as a parent, so it has no relation to the runBlocking.
  */
-private fun add() {
-    val ctx1: CoroutineContext = CoroutineName("Name1")
-    println(ctx1[CoroutineName]?.name) // Name1
-    println(ctx1[Job]?.isActive) // null
-
-    val ctx2: CoroutineContext = Job()
-    println(ctx2[CoroutineName]?.name) // null
-    println(ctx2[Job]?.isActive) // true, because "Active"
-    // is the default state of a job created this way
-
-    val ctx3 = ctx1 + ctx2
-    println(ctx3[CoroutineName]?.name) // Name1
-    println(ctx3[Job]?.isActive) // true
+/**
+fun main(): Unit = runBlocking {
+    launch(Job()) { // the new job replaces one from parent
+        delay(1000)
+        println("Will not be printed")
+    }
 }
+// (prints nothing, finishes immediately)
+*/
 
 /**
- * When another element with the same key is added, just like in a map,
- * the new element replaces the previous one.
- */
-private fun replace() {
-    val ctx1: CoroutineContext = CoroutineName("Name1")
-    println(ctx1[CoroutineName]?.name) // Name1
+fun main(): Unit = runBlocking {
+    val job: Job = launch {
+        delay(1000)
+    }
 
-    val ctx2: CoroutineContext = CoroutineName("Name2")
-    println(ctx2[CoroutineName]?.name) // Name2
-
-    val ctx3 = ctx1 + ctx2
-    println(ctx3[CoroutineName]?.name) // Name2
-
+    val parentJob: Job = coroutineContext.job
+    // or coroutineContext[Job]!!
+    println(job == parentJob) // false
+    val parentChildren: Sequence<Job> = parentJob.children
+    println(parentChildren.first() == job) // true
 }
+*/
 
 /**
- * Finding elements in CoroutineContext
- */
-private fun find() {
-    val ctx: CoroutineContext = CoroutineName("A name")
-    val coroutineName: CoroutineName? = ctx[CoroutineName]
-    // or ctx.get(CoroutineName)
-    println(coroutineName?.name) // A name
-    val job: Job? = ctx[Job] // or ctx.get(Job)
-    println(job) // null
+fun main(): Unit = runBlocking {
+    val name = CoroutineName("Some name")
+    val job = Job()
+
+    launch(name + job) {
+        val childName = coroutineContext[CoroutineName]
+        println(childName == name) // true
+        val childJob = coroutineContext[Job]
+        println(childJob == job) // false
+        println(childJob == job.children.first()) // true
+    }
 }
+*/
 
 /**
- * Subtracting elements in CoroutineContext
- */
-private fun subtracting() {
-    val ctx = CoroutineName("Name1") + Job()
-    println(ctx[CoroutineName]?.name) // Name1
-    println(ctx[Job]?.isActive) // true
+suspend fun main() = coroutineScope {
+    // Job created with a builder is active
+    val job = Job()
+    println(job) // JobImpl{Active}@ADD
+    // until we complete it with a method
+    job.complete()
+    println(job) // JobImpl{Completed}@ADD
 
-    val ctx2 = ctx.minusKey(CoroutineName)
-    println(ctx2[CoroutineName]?.name) // null
-    println(ctx2[Job]?.isActive) // true
+    // launch is initially active by default
+    val activeJob = launch {
+        delay(1000)
+        println("Active job finished")
+    }
+    println(activeJob) // StandaloneCoroutine{Active}@ADD
+    // here we wait until this job is done
+    activeJob.join() // (1 sec)
+    println(activeJob) // StandaloneCoroutine{Completed}@ADD
 
-    val ctx3 = (ctx + CoroutineName("Name2"))
-        .minusKey(CoroutineName)
-    println(ctx3[CoroutineName]?.name) // null
-    println(ctx3[Job]?.isActive) // true
-}
-
-private fun fold() {
-    val ctx = CoroutineName("Name1") + Job()
-
-    ctx.fold("start") { acc, element -> "$acc $element " }
-        .also(::println)
-
-    val empty = emptyList<CoroutineContext>()
-    ctx.fold(empty) { acc, element -> acc + element }
-        .joinToString()
-        .also(::println)
-}
+    // launch started lazily is in New state
+    val lazyJob = launch(start = CoroutineStart.LAZY) {
+        delay(1000)
+        println("Lazy job finished")
+    }
+    println(lazyJob) // LazyStandaloneCoroutine{New}@ADD
+    // we need to start it, to make it active
+    lazyJob.start()
+    println(lazyJob) // LazyStandaloneCoroutine{New}@ADD
+    lazyJob.join() // (1 sec)
+    println(lazyJob) //LazyStandaloneCoroutine{Completed}@ADD
+}*/
